@@ -10,15 +10,25 @@ function Main {
     $pathToNirCmd = $config.pathToNirCmd
 
     Log "Looking for advertisements..."
+    $wasAdPlaying = $false
     while ($true) {
         if (Assert-Ad-Playing $appName) {
-            Log "Advertisment detected"
+            if ($wasAdPlaying) {
+                continue
+            }
+            Log "Advertisement detected"
             Set-App-Volume `
                 -appName $appName `
                 -volume 0 `
                 -pathToNirCmd $pathToNirCmd `
                 -WhatIf:$WhatIf `
                 -Confirm:$Confirm
+
+            $wasAdPlaying = $true
+            continue
+        }
+
+        if (-not $wasAdPlaying) {
             continue
         }
 
@@ -28,6 +38,7 @@ function Main {
             -pathToNirCmd $pathToNirCmd `
             -WhatIf:$WhatIf `
             -Confirm:$Confirm
+
         Start-Sleep -Milliseconds 500
     }
 }
@@ -53,7 +64,7 @@ function Assert-Ad-Playing {
 }
 
 function Set-App-Volume {
-    [CmdletBinding(SupportsShouldProcess=$true)]
+    [CmdletBinding(SupportsShouldProcess=$true, ConfirmImpact='Low')]
     param (
         [string]$appName,
         [float]$volume,
