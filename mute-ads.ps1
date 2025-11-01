@@ -1,17 +1,33 @@
-﻿$global:config = $null
+﻿param (
+    [switch]$WhatIf,
+    [switch]$Confirm
+)
 
 function Main {
-    Read-Config
+    $config = Read-Config
+
+    $appName = $config.applicationName
+    $pathToNirCmd = $config.pathToNirCmd
 
     Log "Looking for advertisements..."
     while ($true) {
-        if (Is-App-Playing-Ads) {
+        if (Assert-Ad-Playing $appName) {
             Log "Advertisment detected"
-            Change-App-Volume 0
+            Set-App-Volume `
+                -appName $appName `
+                -volume 0 `
+                -pathToNirCmd $pathToNirCmd `
+                -WhatIf:$WhatIf `
+                -Confirm:$Confirm
             continue
         }
 
-        Change-App-Volume 1
+        Set-App-Volume `
+            -appName $appName `
+            -volume 1 `
+            -pathToNirCmd $pathToNirCmd `
+            -WhatIf:$WhatIf `
+            -Confirm:$Confirm
         Start-Sleep -Milliseconds 500
     }
 }
@@ -19,26 +35,32 @@ function Main {
 function Read-Config {
     Log "Reading config"
     $configFile = Join-Path -Path $PSScriptRoot -ChildPath "config.json"
-    $global:config = Get-Content $configFile -Raw | ConvertFrom-Json
+    return Get-Content $configFile -Raw | ConvertFrom-Json
 }
 
-function Is-App-Playing-Ads {
-    Get-Process $config.applicationName -ErrorAction SilentlyContinue |
-        ForEach-Object { 
+function Assert-Ad-Playing {
+    param (
+        [string]$appName
+    )
+    Get-Process $appName -ErrorAction SilentlyContinue |
+        ForEach-Object {
             if ($_.MainWindowTitle -like "*Advertisement*") {
                 return $true
             }
         }
-       
+
     return $false
 }
 
-function Change-App-Volume {
+function Set-App-Volume {
+    [CmdletBinding(SupportsShouldProcess=$true)]
     param (
-        [float]$volume
+        [string]$appName,
+        [float]$volume,
+        [string]$pathToNirCmd
     )
 
-    $executable = Get-Process $config.applicationName -ErrorAction SilentlyContinue |
+    $executable = Get-Process $appName -ErrorAction SilentlyContinue |
         Select-Object -First 1 -ExpandProperty Path |
         ForEach-Object { [System.IO.Path]::GetFileName($_) }
 
@@ -46,7 +68,9 @@ function Change-App-Volume {
         return
     }
 
-    & $config.pathToNirCmd setappvolume $executable $volume
+    if ($PSCmdlet.ShouldProcess($appName, "Update volume to $($volume*100)%")) {
+        & $pathToNirCmd setappvolume $executable $volume
+    }
 }
 
 function Log {
@@ -54,7 +78,7 @@ function Log {
         [string]$msg
     )
     $ts = Get-Date -Format "yyyy-MM-dd HH:mm:ss"
-    Write-Host "$ts - $msg"
+    Write-Output "$ts - $msg"
 }
 
 Main
