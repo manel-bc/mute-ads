@@ -1,6 +1,4 @@
-﻿$ErrorActionPreference = "Stop"
-
-function Main {
+﻿function Main {
     while ($true) {
         if (Is-App-Playing-Ads) {
             Change-App-Volume 0
@@ -13,7 +11,7 @@ function Main {
 }
 
 function Is-App-Playing-Ads {
-    Get-Process $config.applicationName |
+    Get-Process $config.applicationName -ErrorAction SilentlyContinue |
         ForEach-Object { 
             if ($_.MainWindowTitle -like "*Advertisement*") {
                 return $true
@@ -28,9 +26,13 @@ function Change-App-Volume {
         [float]$volume
     )
 
-    $executable = Get-Process $config.applicationName |
+    $executable = Get-Process $config.applicationName -ErrorAction SilentlyContinue |
         Select-Object -First 1 -ExpandProperty Path |
         ForEach-Object { [System.IO.Path]::GetFileName($_) }
+
+    if ([string]::IsNullOrEmpty($executable)) {
+        return
+    }
 
     & $config.pathToNirCmd setappvolume $executable $volume
 }
